@@ -1,0 +1,284 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { fetchResources, fetchLogs, markForDeletion, exemptResource, onboardAccount, triggerManualScan } from './api';
+import { AuthProvider, useAuth } from './context/AuthContext';
+
+import AuthPage from './pages/AuthPage';
+import Sidebar from './components/Sidebar';
+import Topbar from './components/Topbar';
+import MetricsRow from './components/MetricsRow';
+import ResourceTable from './components/ResourceTable';
+import AuditLogs from './components/AuditLogs';
+import AccountForm from './components/AccountForm';
+import ChartsRow from './components/ChartsRow';
+
+// ─── Page Configs ─────────────────────────────────────────────────────────────
+const PAGE_META = {
+  dashboard: {
+    title: 'FinOps Dashboard',
+    subtitle: 'Real-time cloud cost intelligence across all connected AWS accounts',
+  },
+  resources: {
+    title: 'Waste Inventory',
+    subtitle: 'Browse, filter and act on detected resource waste',
+  },
+  logs: {
+    title: 'Audit Log',
+    subtitle: 'Complete operational history and compliance trail',
+  },
+  accounts: {
+    title: 'Connect Account',
+    subtitle: 'Onboard a new AWS account for automated FinOps scanning',
+  },
+};
+
+// ─── Loading Screen ────────────────────────────────────────────────────────────
+function LoadingScreen() {
+  return (
+    <div className="loading-screen">
+      <div style={{ position: 'relative' }}>
+        <div className="loading-spinner" />
+        <div style={{
+          position: 'absolute', inset: 0, display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+          fontSize: 18,
+        }}>☁️</div>
+      </div>
+      <div className="loading-text">Aggregating FinOps intelligence...</div>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Scanning connected AWS accounts</div>
+    </div>
+  );
+}
+
+// ─── Scan Notification Banner ──────────────────────────────────────────────────
+function ScanBanner({ onDismiss }) {
+  return (
+    <div className="scan-progress fade-in" style={{ margin: '0 28px' }}>
+      <div style={{
+        width: 14, height: 14,
+        border: '2px solid rgba(34,211,238,0.3)',
+        borderTopColor: 'var(--cyan)',
+        borderRadius: '50%',
+        animation: 'spin 0.8s linear infinite',
+        flexShrink: 0,
+      }} />
+      <span>Global infrastructure scan in progress — data will refresh automatically...</span>
+      <button
+        onClick={onDismiss}
+        style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--cyan)', cursor: 'pointer', fontSize: 12 }}
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
+// ─── Dashboard (protected inner shell) ────────────────────────────────────────
+function Dashboard() {
+  const { isAuthenticated, logout } = useAuth();
+  const [resources, setResources] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [dataError, setDataError] = useState('');
+  const [activePage, setActivePage] = useState('dashboard');
+  const [scanning, setScanning] = useState(false);
+  const [showScanBanner, setShowScanBanner] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const loadData = useCallback(async () => {
+    try {
+      setDataError('');
+      const [resourceData, logData] = await Promise.all([fetchResources(), fetchLogs()]);
+      setResources(resourceData);
+      setLogs(logData);
+    } catch (err) {
+      const msg = err.message || '';
+      // Only force-logout when the server explicitly rejects the token
+      const isAuthError = msg.includes('No token') || msg.includes('Invalid token') || msg.includes('Session expired');
+      if (isAuthError) {
+        logout();
+      } else {
+        // Show a non-intrusive error — could be backend offline or no data yet
+        setDataError(msg || 'Could not reach backend. Is the server running?');
+        console.error('Failed to load dashboard data:', err);
+      }
+    }
+  }, [logout]);
+
+  useEffect(() => {
+    const init = async () => {
+      await loadData();
+      setLoading(false);
+    };
+    init();
+  }, [loadData]);
+
+  // Auto-refresh every 60 seconds
+  useEffect(() => {
+    const id = setInterval(loadData, 60000);
+    return () => clearInterval(id);
+  }, [loadData]);
+
+  const handleForceScan = async () => {
+    if (scanning) return;
+    setScanning(true);
+    setShowScanBanner(true);
+    try {
+      await triggerManualScan();
+      setTimeout(async () => {
+        await loadData();
+        setScanning(false);
+        setTimeout(() => setShowScanBanner(false), 3000);
+      }, 4000);
+    } catch (err) {
+      alert('Scan trigger failed: ' + err.message);
+      setScanning(false);
+      setShowScanBanner(false);
+    }
+  };
+
+  const handleResourceAction = async (id, type) => {
+    try {
+      if (type === 'delete') await markForDeletion(id);
+      if (type === 'exempt') await exemptResource(id);
+      await loadData();
+    } catch (err) {
+      alert('Action failed: ' + err.message);
+    }
+  };
+
+  const handleOnboard = async (formData) => {
+    await onboardAccount(formData);
+    await triggerManualScan();
+    setTimeout(loadData, 3000);
+  };
+
+  const meta = PAGE_META[activePage];
+  const stagedCount = resources.filter(r => r.status === 'marked_for_deletion').length;
+
+  if (loading) return <LoadingScreen />;
+
+  return (
+    <div className="app-layout">
+      {/* Animated background orbs */}
+      <div className="bg-orbs" aria-hidden="true">
+        <div className="bg-orb bg-orb-1" />
+        <div className="bg-orb bg-orb-2" />
+        <div className="bg-orb bg-orb-3" />
+      </div>
+
+      {/* Sidebar */}
+      <Sidebar
+        activePage={activePage}
+        onNavigate={setActivePage}
+        resourceCount={resources.length}
+        stagedCount={stagedCount}
+      />
+
+      {/* Main content */}
+      <div className="main-content">
+        <Topbar
+          title={meta.title}
+          subtitle={meta.subtitle}
+          onScan={handleForceScan}
+          scanning={scanning}
+        />
+
+        {showScanBanner && (
+          <div style={{ padding: '12px 28px 0' }}>
+            <ScanBanner onDismiss={() => setShowScanBanner(false)} />
+          </div>
+        )}
+
+        {dataError && (
+          <div style={{ padding: '12px 28px 0' }}>
+            <div className="alert alert-error" style={{ gap: 10 }}>
+              <span>⚠️</span>
+              <span>{dataError}</span>
+              <button
+                onClick={loadData}
+                style={{ marginLeft: 'auto', background: 'none', border: '1px solid var(--red)', borderRadius: 6, color: 'var(--red)', cursor: 'pointer', fontSize: 11, padding: '2px 10px', fontFamily: 'var(--font-sans)' }}
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
+
+        <main className="page-content">
+          {/* ── DASHBOARD PAGE ── */}
+          {activePage === 'dashboard' && (
+            <>
+              <MetricsRow resources={resources} />
+              <ChartsRow resources={resources} />
+              <div className="two-col-grid">
+                <ResourceTable
+                  resources={resources.slice(0, 10)}
+                  onAction={handleResourceAction}
+                />
+                <AuditLogs logs={logs} compact />
+              </div>
+            </>
+          )}
+
+          {/* ── RESOURCES PAGE ── */}
+          {activePage === 'resources' && (
+            <ResourceTable
+              resources={resources}
+              onAction={handleResourceAction}
+            />
+          )}
+
+          {/* ── LOGS PAGE ── */}
+          {activePage === 'logs' && (
+            <AuditLogs logs={logs} compact={false} />
+          )}
+
+          {/* ── ACCOUNTS PAGE ── */}
+          {activePage === 'accounts' && (
+            <div style={{ maxWidth: 540 }}>
+              <AccountForm onSubmit={handleOnboard} loading={actionLoading} />
+
+              {/* Required IAM permissions hint */}
+              <div className="card fade-in" style={{ marginTop: 16, animationDelay: '200ms' }}>
+                <div className="card-body" style={{ padding: '16px 20px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 10 }}>
+                    🔐 Required IAM Permissions
+                  </div>
+                  {[
+                    'ec2:DescribeInstances',
+                    'ec2:DescribeVolumes',
+                    'rds:DescribeDBInstances',
+                    'elasticloadbalancing:DescribeLoadBalancers',
+                    'ce:GetCostAndUsage',
+                  ].map(perm => (
+                    <div key={perm} style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--cyan)',
+                      padding: '3px 8px', background: 'var(--cyan-dim)', borderRadius: 5,
+                      display: 'inline-block', margin: '2px 3px',
+                    }}>
+                      {perm}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+// ─── Root App with Auth Gate ──────────────────────────────────────────────────
+function AppInner() {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <Dashboard /> : <AuthPage />;
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
+  );
+}

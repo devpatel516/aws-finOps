@@ -14,9 +14,17 @@ async function getClient(account, region) {
   });
 }
 
-async function runGlobalScanEngine() {
+async function runGlobalScanEngine(awsAccountIds = null) {
   console.log("Starting Multi-Account Discovery Cycle...");
-  const accounts = await Account.find({ status: 'active' });
+
+  // 🔒 If called with a list of account IDs (user-triggered scan), only scan those.
+  //    If called from the cron job (no arg), scan all active accounts globally.
+  const filter = { status: 'active' };
+  if (awsAccountIds && awsAccountIds.length > 0) {
+    filter.awsAccountId = { $in: awsAccountIds };
+  }
+
+  const accounts = await Account.find(filter);
 
   for (const account of accounts) {
     try {
