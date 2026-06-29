@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layers, Trash2, Shield, Search, Filter, ChevronDown } from 'lucide-react';
+import { Layers, Trash2, Shield, Search, Filter, ChevronDown, CheckCircle, Clock } from 'lucide-react';
 
 const STATUS_LABELS = {
   detected: { label: 'Detected', cls: 'badge-detected' },
@@ -102,7 +102,9 @@ export default function ResourceTable({ resources, onAction, loading }) {
       <div className="card-body" style={{ padding: 0 }}>
         {filtered.length === 0 ? (
           <div className="empty-state" style={{ margin: 24 }}>
-            <div className="empty-state-icon">✅</div>
+            <div className="empty-state-icon">
+              <CheckCircle size={28} style={{ color: 'var(--emerald)' }} />
+            </div>
             <div className="empty-state-text">No resource waste detected</div>
             <div className="empty-state-sub">Run a scan to discover leaking AWS resources</div>
           </div>
@@ -148,18 +150,10 @@ export default function ResourceTable({ resources, onAction, loading }) {
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         {item.status === 'marked_for_deletion' ? (
-                          <span className="badge badge-staged" style={{ fontSize: 9 }}>⏳ Pending Cleanup</span>
-                        ) : item.status === 'exempt' ? (
-                          <span className="badge badge-exempt" style={{ fontSize: 9 }}>🛡 Whitelisted</span>
-                        ) : (
-                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              onClick={() => onAction(item.resourceId, 'exempt')}
-                              title="Exempt from automation"
-                            >
-                              <Shield size={11} /> Exempt
-                            </button>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+                            <span className="badge badge-staged" style={{ fontSize: 9, display: 'inline-flex', alignItems: 'center', gap: 4, marginRight: 4 }}>
+                              <Clock size={10} /> Staged
+                            </span>
                             {isConfirming ? (
                               <div style={{ display: 'flex', gap: 4 }}>
                                 <button
@@ -179,10 +173,32 @@ export default function ResourceTable({ resources, onAction, loading }) {
                               <button
                                 className="btn btn-danger btn-sm"
                                 onClick={() => handleAction(item.resourceId, 'delete')}
+                                title="Delete immediately on AWS"
                               >
-                                <Trash2 size={11} /> Stage
+                                <Trash2 size={11} /> Delete Now
                               </button>
                             )}
+                          </div>
+                        ) : item.status === 'exempt' ? (
+                          <span className="badge badge-exempt" style={{ fontSize: 9, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <Shield size={10} /> Whitelisted
+                          </span>
+                        ) : (
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => onAction(item.resourceId, 'exempt')}
+                              title="Exempt from automation"
+                            >
+                              <Shield size={11} /> Exempt
+                            </button>
+                            <button
+                              className="btn btn-danger btn-sm"
+                              onClick={() => onAction(item.resourceId, 'stage')}
+                              title="Stage for cleanup"
+                            >
+                              <Trash2 size={11} /> Stage
+                            </button>
                           </div>
                         )}
                       </td>

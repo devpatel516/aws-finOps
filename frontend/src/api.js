@@ -87,3 +87,24 @@ export const triggerManualScan = async () => {
   });
   return handleResponse(res);
 };
+
+export const deleteResourceOnTheSpot = async (resourceId) => {
+  const res = await fetch(`${API_BASE_URL}/resources/${resourceId}/delete`, {
+    method: 'POST',
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+};
+
+export const fetchAccounts = async () => {
+  const res = await fetch(`${API_BASE_URL}/accounts`, { headers: authHeaders() });
+  return handleResponse(res);
+};
+
+export const disconnectAccount = async () => {
+  const res = await fetch(`${API_BASE_URL}/accounts`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+};

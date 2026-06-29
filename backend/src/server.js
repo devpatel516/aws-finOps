@@ -24,10 +24,10 @@ cron.schedule('0 */6 * * *', () => {
   runGlobalScanEngine();
 });
 
-// Remediation removal updates engine executes daily at midnight
-cron.schedule('0 0 * * *', () => {
-  runCleanupEngine();
-});
+// Remediation removal updates engine daily cron is disabled as requested by the user
+// cron.schedule('0 0 * * *', () => {
+//   runCleanupEngine();
+// });
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

@@ -1,6 +1,7 @@
 const { EC2Client, DescribeRegionsCommand } = require("@aws-sdk/client-ec2");
 const Account = require("../models/Account");
 const Resource = require("../models/Resource");
+const AuditLog = require("../models/AuditLog");
 const { scanEBS, scanEIP, scanStoppedEC2 } = require("./scanners");
 const { remediateResource } = require("./remediators");
 
@@ -35,11 +36,36 @@ async function runGlobalScanEngine(awsAccountIds = null) {
       for (const region of regions) {
         try {
           const client = await getClient(account, region);
-          await Promise.all([
+          const [ebsIds, eipIds, ec2Ids] = await Promise.all([
             scanEBS(account, region, client),
             scanEIP(account, region, client),
             scanStoppedEC2(account, region, client)
           ]);
+
+          const regionFoundIds = [...ebsIds, ...eipIds, ...ec2Ids];
+
+          // Identify and clean up resources in the database that are no longer active/unused in AWS for this region and account
+          const missingResources = await Resource.find({
+            accountId: account._id,
+            region: region,
+            status: { $in: ['detected', 'marked_for_deletion', 'exempt'] },
+            resourceId: { $nin: regionFoundIds }
+          });
+
+          for (const res of missingResources) {
+            res.status = 'deleted';
+            res.remediatedAt = new Date();
+            await res.save();
+
+            await AuditLog.create({
+              awsAccountId: res.awsAccountId,
+              resourceId: res.resourceId,
+              resourceType: res.resourceType,
+              region: res.region,
+              action: 'DELETED',
+              details: 'No longer detected on AWS during regional scan (cleaned up or altered externally).'
+            });
+          }
         } catch (err) {
           console.error(`Skipping regional sweep [${region}] for account ${account.awsAccountId}:`, err.message);
         }

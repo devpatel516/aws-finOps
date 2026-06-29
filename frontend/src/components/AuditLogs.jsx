@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Activity, Search, Download } from 'lucide-react';
+import { Activity, Search, Download, CheckCircle, Trash2, Shield, AlertTriangle, FileText } from 'lucide-react';
 
 const ACTION_CONFIG = {
-  DELETED:            { cls: 'DELETED',            emoji: '✅' },
-  MARKED_FOR_DELETION:{ cls: 'MARKED_FOR_DELETION', emoji: '🗑️' },
-  EXEMPTED:           { cls: 'EXEMPTED',            emoji: '🛡' },
-  SCANNED:            { cls: 'SCANNED',             emoji: '🔍' },
-  DETECTED:           { cls: 'DETECTED',            emoji: '⚠️' },
+  DELETED:            { cls: 'DELETED',            icon: CheckCircle },
+  MARKED_FOR_DELETION:{ cls: 'MARKED_FOR_DELETION', icon: Trash2 },
+  EXEMPTED:           { cls: 'EXEMPTED',            icon: Shield },
+  SCANNED:            { cls: 'SCANNED',             icon: Search },
+  DETECTED:           { cls: 'DETECTED',            icon: AlertTriangle },
 };
 
 function formatTimeAgo(ts) {
@@ -83,19 +83,22 @@ export default function AuditLogs({ logs, compact = false }) {
       <div className="card-body" style={{ maxHeight: compact ? 300 : 480, overflowY: 'auto' }}>
         {displayLogs.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-state-icon">📋</div>
+            <div className="empty-state-icon">
+              <FileText size={28} style={{ color: 'var(--text-muted)' }} />
+            </div>
             <div className="empty-state-text">No audit events found</div>
             <div className="empty-state-sub">Logs will appear after the first scan</div>
           </div>
         ) : (
           displayLogs.map((log, idx) => {
-            const cfg = ACTION_CONFIG[log.action] || { cls: 'SCANNED', emoji: '•' };
+            const cfg = ACTION_CONFIG[log.action] || { cls: 'SCANNED', icon: Search };
+            const LogIcon = cfg.icon;
             return (
               <div key={log._id || idx} className="log-entry fade-in" style={{ animationDelay: `${idx * 20}ms` }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-                    <span className={`log-action ${cfg.cls}`}>
-                      {cfg.emoji} {log.action?.replace('_', ' ')}
+                    <span className={`log-action ${cfg.cls}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <LogIcon size={10} /> {log.action?.replace('_', ' ')}
                     </span>
                     <span className="log-resource" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>
                       {log.resourceId}

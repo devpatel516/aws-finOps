@@ -2,7 +2,7 @@ import React from 'react';
 import { RefreshCw, LogOut, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-export default function Topbar({ title, subtitle, onScan, scanning }) {
+export default function Topbar({ title, subtitle, onScan, scanning, connectedAccount }) {
   const { user, logout } = useAuth();
 
   const initials = user?.name
@@ -21,6 +21,29 @@ export default function Topbar({ title, subtitle, onScan, scanning }) {
       </div>
 
       <div className="topbar-actions">
+        {/* AWS Connection Indicator */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '6px 12px',
+          background: connectedAccount ? 'var(--emerald-dim)' : 'var(--red-dim)',
+          border: `1px solid ${connectedAccount ? 'rgba(29,129,2,0.15)' : 'rgba(209,50,18,0.15)'}`,
+          borderRadius: 8,
+          fontSize: 10,
+          fontWeight: 600,
+          color: connectedAccount ? 'var(--emerald)' : 'var(--red)',
+          marginRight: 6
+        }}>
+          <div style={{
+            width: 6, height: 6,
+            borderRadius: '50%',
+            background: connectedAccount ? 'var(--emerald)' : 'var(--red)',
+            boxShadow: connectedAccount ? '0 0 8px var(--emerald)' : '0 0 8px var(--red)'
+          }} />
+          {connectedAccount ? `AWS: ${connectedAccount.awsAccountId}` : 'AWS Not Connected'}
+        </div>
+
         {/* Clock */}
         <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'right', lineHeight: 1.4 }}>
           <div style={{ fontFamily: 'var(--font-mono)' }}>{timeStr}</div>

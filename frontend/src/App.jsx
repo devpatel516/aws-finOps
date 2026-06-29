@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { fetchResources, fetchLogs, markForDeletion, exemptResource, onboardAccount, triggerManualScan } from './api';
+import { fetchResources, fetchLogs, markForDeletion, exemptResource, onboardAccount, triggerManualScan, deleteResourceOnTheSpot, fetchAccounts, disconnectAccount } from './api';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { Cloud, AlertTriangle, Lock } from 'lucide-react';
 
 import AuthPage from './pages/AuthPage';
 import Sidebar from './components/Sidebar';
@@ -41,7 +42,9 @@ function LoadingScreen() {
           position: 'absolute', inset: 0, display: 'flex',
           alignItems: 'center', justifyContent: 'center',
           fontSize: 18,
-        }}>☁️</div>
+        }}>
+          <Cloud size={16} style={{ color: 'var(--primary)' }} />
+        </div>
       </div>
       <div className="loading-text">Aggregating FinOps intelligence...</div>
       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Scanning connected AWS accounts</div>
@@ -77,6 +80,7 @@ function Dashboard() {
   const { isAuthenticated, logout } = useAuth();
   const [resources, setResources] = useState([]);
   const [logs, setLogs] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dataError, setDataError] = useState('');
   const [activePage, setActivePage] = useState('dashboard');
@@ -87,9 +91,14 @@ function Dashboard() {
   const loadData = useCallback(async () => {
     try {
       setDataError('');
-      const [resourceData, logData] = await Promise.all([fetchResources(), fetchLogs()]);
+      const [resourceData, logData, accountData] = await Promise.all([
+        fetchResources(),
+        fetchLogs(),
+        fetchAccounts()
+      ]);
       setResources(resourceData);
       setLogs(logData);
+      setAccounts(accountData);
     } catch (err) {
       const msg = err.message || '';
       // Only force-logout when the server explicitly rejects the token
@@ -138,7 +147,8 @@ function Dashboard() {
 
   const handleResourceAction = async (id, type) => {
     try {
-      if (type === 'delete') await markForDeletion(id);
+      if (type === 'stage') await markForDeletion(id);
+      if (type === 'delete') await deleteResourceOnTheSpot(id);
       if (type === 'exempt') await exemptResource(id);
       await loadData();
     } catch (err) {
@@ -150,6 +160,15 @@ function Dashboard() {
     await onboardAccount(formData);
     await triggerManualScan();
     setTimeout(loadData, 3000);
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      await disconnectAccount();
+      await loadData();
+    } catch (err) {
+      alert('Failed to disconnect account: ' + err.message);
+    }
   };
 
   const meta = PAGE_META[activePage];
@@ -181,6 +200,7 @@ function Dashboard() {
           subtitle={meta.subtitle}
           onScan={handleForceScan}
           scanning={scanning}
+          connectedAccount={accounts[0]}
         />
 
         {showScanBanner && (
@@ -192,7 +212,7 @@ function Dashboard() {
         {dataError && (
           <div style={{ padding: '12px 28px 0' }}>
             <div className="alert alert-error" style={{ gap: 10 }}>
-              <span>⚠️</span>
+              <AlertTriangle size={14} style={{ color: 'var(--red)', flexShrink: 0 }} />
               <span>{dataError}</span>
               <button
                 onClick={loadData}
@@ -236,13 +256,18 @@ function Dashboard() {
           {/* ── ACCOUNTS PAGE ── */}
           {activePage === 'accounts' && (
             <div style={{ maxWidth: 540 }}>
-              <AccountForm onSubmit={handleOnboard} loading={actionLoading} />
+              <AccountForm 
+                onSubmit={handleOnboard} 
+                loading={actionLoading} 
+                connectedAccount={accounts[0]} 
+                onDisconnect={handleDisconnect} 
+              />
 
               {/* Required IAM permissions hint */}
               <div className="card fade-in" style={{ marginTop: 16, animationDelay: '200ms' }}>
                 <div className="card-body" style={{ padding: '16px 20px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 10 }}>
-                    🔐 Required IAM Permissions
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Lock size={13} style={{ color: 'var(--primary)' }} /> Required IAM Permissions
                   </div>
                   {[
                     'ec2:DescribeInstances',

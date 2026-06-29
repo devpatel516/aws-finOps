@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import {
   CloudLightning, Eye, EyeOff, Mail, Lock, User,
   Hash, Key, Cloud, ChevronDown, ChevronUp,
-  TrendingDown, Shield, Zap, BarChart2, CheckCircle, AlertCircle
+  TrendingDown, Shield, Zap, BarChart2, CheckCircle, AlertCircle,
+  Search, DollarSign, FileText
 } from 'lucide-react';
 import { authAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -10,11 +11,11 @@ import { useAuth } from '../context/AuthContext';
 // ── Brand Panel ───────────────────────────────────────────────────────────────
 function BrandPanel() {
   const features = [
-    { icon: '🔍', text: 'Auto-detect idle EC2, unattached EBS & orphaned Elastic IPs' },
-    { icon: '💰', text: 'Real-time monthly waste cost aggregation across all accounts' },
-    { icon: '🛡️', text: 'Role-based access — Admin and Viewer permissions' },
-    { icon: '📋', text: 'Full compliance audit log with savings tracking' },
-    { icon: '⚡', text: 'One-click staging and automated cleanup pipelines' },
+    { icon: Search, text: 'Auto-detect idle EC2, unattached EBS & orphaned Elastic IPs' },
+    { icon: DollarSign, text: 'Real-time monthly waste cost aggregation across all accounts' },
+    { icon: Shield, text: 'Role-based access — Admin and Viewer permissions' },
+    { icon: FileText, text: 'Full compliance audit log with savings tracking' },
+    { icon: Zap, text: 'One-click staging and automated cleanup pipelines' },
   ];
 
   return (
@@ -36,14 +37,17 @@ function BrandPanel() {
       </p>
 
       <div className="auth-features">
-        {features.map((f, i) => (
-          <div className="auth-feature" key={i}>
-            <div className="auth-feature-dot" style={{ background: 'rgba(34,211,238,0.08)', border: '1px solid rgba(34,211,238,0.15)' }}>
-              {f.icon}
+        {features.map((f, i) => {
+          const Icon = f.icon;
+          return (
+            <div className="auth-feature" key={i}>
+              <div className="auth-feature-dot" style={{ background: 'rgba(236,114,17,0.08)', border: '1px solid rgba(236,114,17,0.15)' }}>
+                <Icon size={12} style={{ color: 'var(--primary)' }} />
+              </div>
+              {f.text}
             </div>
-            {f.text}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

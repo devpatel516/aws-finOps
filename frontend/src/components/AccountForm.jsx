@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { PlusCircle, Cloud, Key, Lock, Hash, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
-export default function AccountForm({ onSubmit, loading }) {
+export default function AccountForm({ onSubmit, loading, connectedAccount, onDisconnect }) {
   const [form, setForm] = useState({
     accountName: '',
     awsAccountId: '',
@@ -27,6 +27,92 @@ export default function AccountForm({ onSubmit, loading }) {
   };
 
   const isValid = form.accountName && form.awsAccountId.match(/^\d{12}$/) && form.accessKeyId.startsWith('AKIA') && form.secretAccessKey.length > 20;
+
+  if (connectedAccount) {
+    return (
+      <div className="card fade-in">
+        <div className="card-header">
+          <div className="card-title">
+            <div className="card-title-icon" style={{ background: 'var(--emerald-dim)', color: 'var(--emerald)' }}>
+              <CheckCircle size={14} />
+            </div>
+            AWS Account Integration
+          </div>
+        </div>
+
+        <div className="card-body">
+          <div style={{
+            padding: '16px 20px',
+            background: 'rgba(29,129,2,0.06)',
+            border: '1px solid rgba(29,129,2,0.15)',
+            borderRadius: 10,
+            fontSize: 12,
+            color: 'var(--text-secondary)',
+            marginBottom: 20,
+            lineHeight: 1.6
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--emerald)', fontWeight: 600, fontSize: 13, marginBottom: 8 }}>
+              <Cloud size={15} /> AWS Connected Successfully
+            </div>
+            Your FinOps scanning engine is actively querying waste inventory metrics for this environment. Only one active AWS account connection is permitted per profile.
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24, padding: '0 4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Account Name</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 12 }}>{connectedAccount.accountName}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>AWS Account ID</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--blue)', fontSize: 12 }}>{connectedAccount.awsAccountId}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Status</span>
+              <span style={{
+                textTransform: 'uppercase', fontSize: 10, fontWeight: 700,
+                color: connectedAccount.status === 'active' ? 'var(--emerald)' : 'var(--amber)',
+                background: connectedAccount.status === 'active' ? 'var(--emerald-dim)' : 'var(--amber-dim)',
+                padding: '2px 6px', borderRadius: 4
+              }}>{connectedAccount.status}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 8 }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Connected Since</span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                {new Date(connectedAccount.createdAt).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+              </span>
+            </div>
+          </div>
+
+          {msg && (
+            <div className={`alert ${msg.type === 'success' ? 'alert-success' : 'alert-error'}`} style={{ marginBottom: 14 }}>
+              {msg.type === 'success' ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
+              {msg.text}
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="btn btn-danger btn-lg"
+            style={{ width: '100%', justifyContent: 'center' }}
+            disabled={loading}
+            onClick={async () => {
+              setMsg(null);
+              if (confirm('Are you sure you want to disconnect and delete your connected AWS account? This will also purge its scanned resources.')) {
+                try {
+                  await onDisconnect();
+                  setMsg({ type: 'success', text: 'AWS Account successfully disconnected.' });
+                } catch (err) {
+                  setMsg({ type: 'error', text: err.message || 'Disconnect failed.' });
+                }
+              }
+            }}
+          >
+            {loading ? 'Disconnecting...' : 'Disconnect AWS Account'}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="card fade-in">

@@ -24,6 +24,10 @@ async function getOwnedAwsAccountIds(userId) {
 // Onboard a new AWS account — always stamped with the calling user's id
 router.post('/accounts', async (req, res) => {
   try {
+    const existingAccount = await Account.findOne({ ownerId: req.user.id });
+    if (existingAccount) {
+      return res.status(400).json({ error: 'You have already connected an AWS account. Only one AWS account is allowed per user profile.' });
+    }
     const account = await Account.create({ ...req.body, ownerId: req.user.id });
     res.status(201).json({ message: 'AWS Account integration context verified and onboarded.', account });
   } catch (error) {
@@ -179,6 +183,76 @@ router.post('/scan', requireRole('admin'), async (req, res) => {
     );
 
     res.json({ message: 'Scan triggered for your connected AWS accounts.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ── POST /api/resources/:id/delete ───────────────────────────────────────────
+// SECURITY: only the owner of the AWS account can remediate/delete the resource.
+router.post('/resources/:id/delete', requireRole('admin'), async (req, res) => {
+  try {
+    const ownedIds = await getOwnedAwsAccountIds(req.user.id);
+
+    if (ownedIds.length === 0) {
+      return res.status(403).json({ error: 'No AWS accounts connected to your profile.' });
+    }
+
+    const resource = await Resource.findOne({
+      resourceId: req.params.id,
+      awsAccountId: { $in: ownedIds }
+    });
+
+    if (!resource) {
+      return res.status(404).json({ error: 'Resource not found or you do not have permission to delete it.' });
+    }
+
+    // Get the AWS account to authenticate
+    const account = await Account.findOne({ awsAccountId: resource.awsAccountId });
+    if (!account || account.status !== 'active') {
+      return res.status(400).json({ error: 'The AWS account associated with this resource is not active.' });
+    }
+
+    const { EC2Client } = require("@aws-sdk/client-ec2");
+    const { remediateResource } = require("../workers/remediators");
+
+    const ec2Client = new EC2Client({
+      region: resource.region,
+      credentials: {
+        accessKeyId: account.accessKeyId,
+        secretAccessKey: account.secretAccessKey
+      }
+    });
+
+    // Remediate (delete) immediately
+    await remediateResource(resource, ec2Client);
+
+    // Fetch the updated resource state to return
+    const updatedResource = await Resource.findOne({ resourceId: resource.resourceId });
+
+    if (updatedResource.status === 'deleted') {
+      res.json({ message: 'Resource deleted successfully from AWS.', resource: updatedResource });
+    } else {
+      res.status(500).json({ error: 'Failed to delete resource. Please check audit logs.' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ── DELETE /api/accounts ──────────────────────────────────────────────────────
+// Disconnect and remove the user's AWS account.
+router.delete('/accounts', async (req, res) => {
+  try {
+    const account = await Account.findOneAndDelete({ ownerId: req.user.id });
+    if (!account) {
+      return res.status(404).json({ error: 'No AWS account connected to disconnect.' });
+    }
+    // Delete resources and audit logs associated with this account from the DB
+    await Resource.deleteMany({ accountId: account._id });
+    await AuditLog.deleteMany({ awsAccountId: account.awsAccountId });
+
+    res.json({ message: 'AWS Account disconnected and integrations removed successfully.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
