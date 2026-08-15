@@ -13,21 +13,16 @@ pipeline {
     }
 
     stages {
-        // ==================== STAGE 1: Checkout ====================
-        stage('📥 Checkout') {
-            steps {
-                echo '🔄 Pulling latest code from GitHub...'
-                checkout scm
-            }
-        }
-
-        // ==================== STAGE 2: Prepare Deployment Directory ====================
+        // ==================== STAGE 1: Prepare Deployment Directory ====================
         stage('📁 Prepare Deploy Directory') {
             steps {
                 echo '📂 Syncing code to deployment directory...'
                 sh """
-                    # Create deploy directory if it doesn't exist
-                    mkdir -p ${DEPLOY_DIR}
+                    # Create deploy directory using sudo
+                    sudo mkdir -p ${DEPLOY_DIR}
+                    
+                    # Fix folder ownership so jenkins can write files into it
+                    sudo chown -R jenkins:jenkins ${DEPLOY_DIR}
 
                     # Sync the workspace to the deployment directory
                     rsync -av --delete \
@@ -39,7 +34,7 @@ pipeline {
             }
         }
 
-        // ==================== STAGE 3: Inject Environment Variables ====================
+        // ==================== STAGE 2: Inject Environment Variables ====================
         stage('🔐 Inject Secrets') {
             steps {
                 echo '🔑 Injecting production environment variables...'
@@ -49,7 +44,8 @@ pipeline {
                     string(credentialsId: 'ENCRYPTION_KEY', variable: 'ENCRYPTION_KEY')
                 ]) {
                     sh """
-                        cat > ${DEPLOY_DIR}/backend/.env.production << 'ENVEOF'
+                        # Create the configuration file with sudo
+                        sudo tee ${DEPLOY_DIR}/backend/.env.production << 'ENVEOF' > /dev/null
 PORT=5000
 MONGO_URI=${MONGO_URI}
 JWT_SECRET=${JWT_SECRET}
@@ -61,27 +57,27 @@ ENVEOF
             }
         }
 
-        // ==================== STAGE 4: Build Docker Images ====================
+        // ==================== STAGE 3: Build Docker Images ====================
         stage('🐳 Build Docker Images') {
             steps {
                 echo '🔨 Building Docker images...'
                 dir("${DEPLOY_DIR}") {
-                    sh 'docker compose build --no-cache'
+                    sh 'sudo docker compose build --no-cache'
                 }
             }
         }
 
-        // ==================== STAGE 5: Deploy ====================
+        // ==================== STAGE 4: Deploy ====================
         stage('🚀 Deploy') {
             steps {
                 echo '🚀 Deploying with Docker Compose...'
                 dir("${DEPLOY_DIR}") {
                     sh """
-                        # Stop existing containers (if any)
-                        docker compose down --remove-orphans || true
+                        # Stop existing containers using sudo
+                        sudo docker compose down --remove-orphans || true
 
-                        # Start fresh containers in detached mode
-                        docker compose up -d
+                        # Start fresh containers
+                        sudo docker compose up -d
 
                         # Wait for services to be healthy
                         echo '⏳ Waiting for services to start...'
@@ -91,33 +87,29 @@ ENVEOF
             }
         }
 
-        // ==================== STAGE 6: Health Check ====================
+        // ==================== STAGE 5: Health Check ====================
         stage('✅ Health Check') {
             steps {
                 echo '🏥 Running health checks...'
                 sh """
-                    # Check if all containers are running
                     echo '--- Container Status ---'
-                    docker compose -f ${DEPLOY_DIR}/docker-compose.yml ps
+                    sudo docker compose -f ${DEPLOY_DIR}/docker-compose.yml ps
 
-                    # Test backend API
                     echo '--- Backend Health ---'
-                    curl -sf http://localhost:5000/api/auth || echo '⚠️ Backend not responding yet (may still be starting)'
+                    curl -sf http://localhost:5000/api/auth || echo '⚠️ Backend not responding yet'
 
-                    # Test frontend
                     echo '--- Frontend Health ---'
                     curl -sf http://localhost:80 || echo '⚠️ Frontend not responding yet'
                 """
             }
         }
 
-        // ==================== STAGE 7: Cleanup ====================
+        // ==================== STAGE 6: Cleanup ====================
         stage('🧹 Cleanup') {
             steps {
                 echo '🧹 Cleaning up unused Docker resources...'
                 sh """
-                    # Remove dangling images to save disk space
-                    docker image prune -f || true
+                    sudo docker image prune -f || true
                 """
             }
         }
@@ -128,8 +120,6 @@ ENVEOF
             echo """
             ✅ ═══════════════════════════════════════════
             ✅  DEPLOYMENT SUCCESSFUL!
-            ✅  Frontend: http://<YOUR_ELASTIC_IP>
-            ✅  Backend:  http://<YOUR_ELASTIC_IP>:5000
             ✅ ═══════════════════════════════════════════
             """
         }
@@ -137,17 +127,17 @@ ENVEOF
             echo """
             ❌ ═══════════════════════════════════════════
             ❌  DEPLOYMENT FAILED!
-            ❌  Check the logs above for errors.
             ❌ ═══════════════════════════════════════════
             """
-            // Optional: rollback to previous version
             sh """
-                cd ${DEPLOY_DIR} && docker compose down || true
-                cd ${DEPLOY_DIR} && docker compose up -d || true
+                # Run cleanup/rollback tasks with sudo if directory exists
+                if [ -d "${DEPLOY_DIR}" ]; then
+                    cd ${DEPLOY_DIR} && sudo docker compose down || true
+                    cd ${DEPLOY_DIR} && sudo docker compose up -d || true
+                fi
             """
         }
         always {
-            // Clean workspace
             cleanWs()
         }
     }
