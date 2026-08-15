@@ -24,8 +24,8 @@ pipeline {
                     # Fix folder ownership so jenkins can write files into it
                     sudo chown -R jenkins:jenkins ${DEPLOY_DIR}
 
-                    # Sync the workspace to the deployment directory
-                    rsync -av --delete \
+                    # Sync the workspace using sudo to bypass parent folder blocks
+                    sudo rsync -av --delete \
                         --exclude '.git' \
                         --exclude 'node_modules' \
                         --exclude '.env' \
