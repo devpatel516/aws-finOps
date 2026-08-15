@@ -58,12 +58,14 @@ ENVEOF
         }
 
         // ==================== STAGE 3: Build Docker Images ====================
+                // ==================== STAGE 3: Build Docker Images ====================
         stage('🐳 Build Docker Images') {
             steps {
                 echo '🔨 Building Docker images...'
-                dir("${DEPLOY_DIR}") {
-                    sh 'sudo docker compose build --no-cache'
-                }
+                sh """
+                    cd ${DEPLOY_DIR}
+                    sudo docker compose build --no-cache
+                """
             }
         }
 
@@ -71,19 +73,18 @@ ENVEOF
         stage('🚀 Deploy') {
             steps {
                 echo '🚀 Deploying with Docker Compose...'
-                dir("${DEPLOY_DIR}") {
-                    sh """
-                        # Stop existing containers using sudo
-                        sudo docker compose down --remove-orphans || true
+                sh """
+                    cd ${DEPLOY_DIR}
+                    # Stop existing containers (if any)
+                    sudo docker compose down --remove-orphans || true
 
-                        # Start fresh containers
-                        sudo docker compose up -d
+                    # Start fresh containers in detached mode
+                    sudo docker compose up -d
 
-                        # Wait for services to be healthy
-                        echo '⏳ Waiting for services to start...'
-                        sleep 15
-                    """
-                }
+                    # Wait for services to be healthy
+                    echo '⏳ Waiting for services to start...'
+                    sleep 15
+                """
             }
         }
 
