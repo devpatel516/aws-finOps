@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   LayoutDashboard, Layers, Activity, PlusCircle,
-  Shield, Settings, ChevronRight, CloudLightning
+  Shield, Settings, ChevronRight, TrendingDown
 } from 'lucide-react';
 
 const navItems = [
@@ -17,9 +17,9 @@ export default function Sidebar({ activePage, onNavigate, resourceCount, stagedC
       <div className="sidebar-logo">
         <div className="logo-mark">
           <div className="logo-icon">
-            <CloudLightning size={18} color="#fff" />
+            <TrendingDown size={18} color="#fff" />
           </div>
-          <span className="logo-text">CloudWaste AI</span>
+          <span className="logo-text">CloudWaste</span>
         </div>
         <div className="logo-sub">FinOps Control Portal</div>
       </div>

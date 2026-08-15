@@ -16,8 +16,6 @@ async function getClient(account, region) {
 }
 
 async function runGlobalScanEngine(awsAccountIds = null) {
-  console.log("Starting Multi-Account Discovery Cycle...");
-
   // 🔒 If called with a list of account IDs (user-triggered scan), only scan those.
   //    If called from the cron job (no arg), scan all active accounts globally.
   const filter = { status: 'active' };
@@ -74,11 +72,9 @@ async function runGlobalScanEngine(awsAccountIds = null) {
       console.error(`Failed executing profile checks for account ${account.awsAccountId}:`, err.message);
     }
   }
-  console.log("Scan Engine Phase Completed.");
 }
 
 async function runCleanupEngine() {
-  console.log("Running Automated Cleanup Execution Cycle...");
   const actionableResources = await Resource.find({ status: 'marked_for_deletion' });
 
   for (const resource of actionableResources) {
@@ -92,7 +88,6 @@ async function runCleanupEngine() {
       console.error(`Failed establishing secure payload client for resource ${resource.resourceId}:`, err.message);
     }
   }
-  console.log("Cleanup Execution Engine Completed.");
 }
 
 module.exports = { runGlobalScanEngine, runCleanupEngine };

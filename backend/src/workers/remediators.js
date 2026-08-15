@@ -25,8 +25,6 @@ async function remediateResource(resource, ec2Client) {
       savingsRealized: resource.monthlyCost,
       details: 'Successfully cleaned up via automated lifecycle cron execution.'
     });
-
-    console.log(`Remediated ${resource.resourceType}: ${resource.resourceId}`);
   } catch (error) {
     console.error(`Remediation failure for ${resource.resourceId}:`, error.message);
     await AuditLog.create({

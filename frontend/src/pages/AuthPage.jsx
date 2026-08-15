@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  CloudLightning, Eye, EyeOff, Mail, Lock, User,
+  Eye, EyeOff, Mail, Lock, User,
   Hash, Key, Cloud, ChevronDown, ChevronUp,
   TrendingDown, Shield, Zap, BarChart2, CheckCircle, AlertCircle,
   Search, DollarSign, FileText
@@ -22,9 +22,9 @@ function BrandPanel() {
     <div className="auth-brand">
       <div className="auth-brand-logo">
         <div className="auth-brand-icon">
-          <CloudLightning size={22} color="#fff" />
+          <TrendingDown size={22} color="#fff" />
         </div>
-        <span className="auth-brand-name">CloudWaste AI</span>
+        <span className="auth-brand-name">CloudWaste</span>
       </div>
 
       <h1 className="auth-brand-tagline">
@@ -32,7 +32,7 @@ function BrandPanel() {
       </h1>
 
       <p className="auth-brand-sub">
-        CloudWaste AI automatically discovers and helps you eliminate idle cloud
+        CloudWaste automatically discovers and helps you eliminate idle cloud
         resources across all your AWS accounts — saving thousands per month.
       </p>
 
@@ -80,7 +80,7 @@ function LoginForm({ onSwitchToRegister }) {
   return (
     <form onSubmit={handleSubmit}>
       <h2 className="auth-title">Welcome back</h2>
-      <p className="auth-subtitle">Sign in to your CloudWaste AI account</p>
+      <p className="auth-subtitle">Sign in to your CloudWaste account</p>
 
       {error && (
         <div className="alert alert-error" style={{ marginBottom: 18 }}>

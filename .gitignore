@@ -1,2 +1,4 @@
 node_modules
 .env
+CICD_PIPELINE_GUIDE.md
+fd
