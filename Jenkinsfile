@@ -1,145 +1,31 @@
 pipeline {
     agent any
 
-    environment {
-        COMPOSE_PROJECT_NAME = 'finops'
-        DEPLOY_DIR = '/home/ubuntu/aws-finops'
-    }
-
     options {
-        timeout(time: 15, unit: 'MINUTES')
         disableConcurrentBuilds()
         timestamps()
     }
 
+    environment {
+        COMPOSE_PROJECT_NAME = 'finops'
+    }
+
     stages {
-        // ==================== STAGE 1: Prepare Deployment Directory ====================
-        stage('📁 Prepare Deploy Directory') {
+        stage('Deploy') {
             steps {
-                echo '📂 Syncing code to deployment directory...'
-                sh """
-                    # Create deploy directory using sudo
-                    sudo mkdir -p ${DEPLOY_DIR}
-                    
-                    # Fix folder ownership so jenkins can write files into it
-                    sudo chown -R jenkins:jenkins ${DEPLOY_DIR}
-
-                    # Sync the workspace using sudo to bypass parent folder blocks
-                    sudo rsync -av --delete \
-                        --exclude '.git' \
-                        --exclude 'node_modules' \
-                        --exclude '.env' \
-                        ${WORKSPACE}/ ${DEPLOY_DIR}/
-                """
-            }
-        }
-
-        // ==================== STAGE 2: Inject Environment Variables ====================
-        stage('🔐 Inject Secrets') {
-            steps {
-                echo '🔑 Injecting production environment variables...'
-                withCredentials([
-                    string(credentialsId: 'MONGO_URI', variable: 'MONGO_URI'),
-                    string(credentialsId: 'JWT_SECRET', variable: 'JWT_SECRET'),
-                    string(credentialsId: 'ENCRYPTION_KEY', variable: 'ENCRYPTION_KEY')
-                ]) {
-                    sh """
-                        # Create the configuration file with sudo
-                        sudo tee ${DEPLOY_DIR}/backend/.env.production << 'ENVEOF' > /dev/null
-PORT=5000
-MONGO_URI=${MONGO_URI}
-JWT_SECRET=${JWT_SECRET}
-JWT_EXPIRES_IN=7d
-ENCRYPTION_KEY=${ENCRYPTION_KEY}
-ENVEOF
-                    """
+                withCredentials([file(credentialsId: 'backend-env-file', variable: 'BACKEND_ENV_FILE')]) {
+                    sh '''
+                        cp "$BACKEND_ENV_FILE" backend/.env
+                        docker compose up -d --build --remove-orphans
+                    '''
                 }
             }
         }
 
-        // ==================== STAGE 3: Build Docker Images ====================
-                // ==================== STAGE 3: Build Docker Images ====================
-        stage('🐳 Build Docker Images') {
+        stage('Status') {
             steps {
-                echo '🔨 Building Docker images...'
-                sh """
-                    cd ${DEPLOY_DIR}
-                    sudo docker compose build --no-cache
-                """
+                sh 'docker compose ps'
             }
-        }
-
-        // ==================== STAGE 4: Deploy ====================
-        stage('🚀 Deploy') {
-            steps {
-                echo '🚀 Deploying with Docker Compose...'
-                sh """
-                    cd ${DEPLOY_DIR}
-                    # Stop existing containers (if any)
-                    sudo docker compose down --remove-orphans || true
-
-                    # Start fresh containers in detached mode
-                    sudo docker compose up -d
-
-                    # Wait for services to be healthy
-                    echo '⏳ Waiting for services to start...'
-                    sleep 15
-                """
-            }
-        }
-
-        // ==================== STAGE 5: Health Check ====================
-        stage('✅ Health Check') {
-            steps {
-                echo '🏥 Running health checks...'
-                sh """
-                    echo '--- Container Status ---'
-                    sudo docker compose -f ${DEPLOY_DIR}/docker-compose.yml ps
-
-                    echo '--- Backend Health ---'
-                    curl -sf http://localhost:5000/api/auth || echo '⚠️ Backend not responding yet'
-
-                    echo '--- Frontend Health ---'
-                    curl -sf http://localhost:80 || echo '⚠️ Frontend not responding yet'
-                """
-            }
-        }
-
-        // ==================== STAGE 6: Cleanup ====================
-        stage('🧹 Cleanup') {
-            steps {
-                echo '🧹 Cleaning up unused Docker resources...'
-                sh """
-                    sudo docker image prune -f || true
-                """
-            }
-        }
-    }
-
-    post {
-        success {
-            echo """
-            ✅ ═══════════════════════════════════════════
-            ✅  DEPLOYMENT SUCCESSFUL!
-            ✅ ═══════════════════════════════════════════
-            """
-        }
-        failure {
-            echo """
-            ❌ ═══════════════════════════════════════════
-            ❌  DEPLOYMENT FAILED!
-            ❌ ═══════════════════════════════════════════
-            """
-            sh """
-                # Run cleanup/rollback tasks with sudo if directory exists
-                if [ -d "${DEPLOY_DIR}" ]; then
-                    cd ${DEPLOY_DIR} && sudo docker compose down || true
-                    cd ${DEPLOY_DIR} && sudo docker compose up -d || true
-                fi
-            """
-        }
-        always {
-            cleanWs()
         }
     }
 }
