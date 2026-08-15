@@ -13,7 +13,7 @@ pipeline {
     stages {
         stage('Deploy') {
     steps {
-        withCredentials([file(credentialsId: 'YOUR_CRED_ID', variable: 'BACKEND_ENV_FILE')]) {
+        withCredentials([file(credentialsId: 'backend-env-file', variable: 'BACKEND_ENV_FILE')]) {
             // Fix ownership of the directory before copying
             sh 'sudo chown -R jenkins:jenkins backend/' 
             
