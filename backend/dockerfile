@@ -2,11 +2,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# 1. Copy only package manifests
 COPY package*.json ./
 
+# 2. Run clean install (caches this layer unless package files change)
 RUN npm ci --omit=dev
 
-COPY . .
+# 3. Copy source files AFTER installing modules
+COPY src/ ./src/
 
 EXPOSE 5000
 
