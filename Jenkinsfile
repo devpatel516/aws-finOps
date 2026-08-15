@@ -150,5 +150,5 @@ ENVEOF
             // Clean workspace
             cleanWs()
         }
-    }.
+    }
 }
